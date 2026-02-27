@@ -1,0 +1,50 @@
+services:
+    api:
+        build: .
+        image: app-base:latest
+        ports:
+            - "8000:8000"
+        env_file:
+            - ".env"
+        volumes:
+            - .:/app
+        depends_on:
+            alembic:
+                condition: service_completed_successfully
+
+    database:
+        container_name: database
+        image: postgis/postgis:16-3.4
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_NAME}
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - database_data:/var/lib/postgresql/data
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+            interval: 5s
+            timeout: 3s
+            retries: 5
+
+    alembic:
+        image: app-base:latest
+        # healthcheck БД не хватает, т.к. PostGIS делает shutdown после запуска
+        command: >
+            sh -c "
+            until pg_isready -h database -p 5432 -U ${DB_USER};
+            do
+            echo 'Waiting for database...';
+            sleep 2;
+            done;
+            alembic upgrade head
+            "
+        depends_on:
+            database:
+                condition: service_healthy
+        env_file:
+            - ".env"
+
+volumes:
+    database_data:
