@@ -11,7 +11,7 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 @router.get(
     "",
-    description="Получение списка организаций"
+    summary="Получение списка организаций"
 )
 async def get_all_organizations(
     filters: OrganizationFilters = Query(None, description="Фильтры для поиска организаций"),
@@ -30,7 +30,7 @@ async def get_all_organizations(
 
 @router.get(
     "/{organization_id}",
-    description="Получение организации по ID"
+    summary="Получение организации по ID"
 )
 async def get_organization_by_id(
     organization_id: int = Path(..., description="ID организации"),

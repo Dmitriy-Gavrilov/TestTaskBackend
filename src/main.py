@@ -23,6 +23,7 @@ app = FastAPI(
     title="Organizations API",
     debug=False,
     lifespan=lifespan,
+    description="API для работы с организациями",
 )
 
 api_router = APIRouter(prefix="/api")
