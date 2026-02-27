@@ -46,7 +46,7 @@ src/
 
 1. **Клонирование репозитория и настройка окружения:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Dmitriy-Gavrilov/TestTaskBackend.git
    cd TestTaskBackend
    cp .env.example .env
    ```
