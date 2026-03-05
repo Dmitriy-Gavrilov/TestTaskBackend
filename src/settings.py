@@ -24,6 +24,15 @@ class DatabaseSettings(BaseSettings):
         )
 
 
+class RedisSettings(BaseSettings):
+    """Класс настроек Redis"""
+
+    REDIS_HOST: str
+    REDIS_PORT: int
+    REDIS_PASSWORD: str
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
 
 class AppSettings(BaseSettings):
     """Класс настроек приложения"""
@@ -38,6 +47,10 @@ def get_db_settings() -> DatabaseSettings:
     """Возвращает настройки базы данных с ленивой инициализацией"""
     return DatabaseSettings()
 
+@lru_cache()
+def get_redis_settings() -> RedisSettings:
+    """Возвращает настройки Redis с ленивой инициализацией"""
+    return RedisSettings()
 
 @lru_cache()
 def get_app_settings() -> AppSettings:
@@ -46,4 +59,5 @@ def get_app_settings() -> AppSettings:
 
 
 db_settings = get_db_settings()
+redis_settings = get_redis_settings()
 app_settings = get_app_settings()

@@ -10,6 +10,7 @@ from src.core.dto.organization import (
     OrganizationDTO,
     UpdateOrganizationDTO,
 )
+from src.integrations.redis import RedisService
 from src.organizations.repository import OrganizationRepository
 from src.organizations.schemas import (
     BuildingSchema,
@@ -82,9 +83,15 @@ class OrganizationService:
     async def get_organizations(
         self,
         filters: OrganizationFilters,
-        repo: OrganizationRepository
+        repo: OrganizationRepository,
+        redis_service: RedisService
     ) -> GetOrganizationsResponse:
         """Получить организации с фильтрацией"""
+        cache_key = f"organizations:{filters.model_dump()}"
+        cached = await redis_service.get_cache(cache_key, GetOrganizationsResponse)
+        if cached:
+            return GetOrganizationsResponse.model_validate(cached)
+
         result = await repo.get_with_filters(
             building_id=filters.building_id,
             activity_name=filters.activity_name,
@@ -100,23 +107,36 @@ class OrganizationService:
 
         organizations = [self._build_organization_response(org) for org in result]
 
-        return GetOrganizationsResponse(organizations=organizations)
+        response = GetOrganizationsResponse(organizations=organizations)
+        await redis_service.set_cache(cache_key, response, ex=300)
+
+        return response
 
     async def get_organization(
         self,
         organization_id: int,
-        repo: OrganizationRepository
+        repo: OrganizationRepository,
+        redis_service: RedisService
     ) -> GetOrganizationResponse:
         """Получить организацию по ID"""
-        result = await self._check_organization_exists(organization_id, repo)
-        return GetOrganizationResponse(organization=self._build_organization_response(result))
+        cache_key = f"organization:{organization_id}"
+        cached = await redis_service.get_cache(cache_key, GetOrganizationResponse)
+        if cached:
+            return GetOrganizationResponse.model_validate(cached)
+
+        org = await self._check_organization_exists(organization_id, repo)
+        response = GetOrganizationResponse(organization=self._build_organization_response(org))
+
+        await redis_service.set_cache(cache_key, response, ex=300)
+        return response
 
     async def create_organization(
         self,
         organization: CreateOrganizationRequest,
         org_repo: OrganizationRepository,
         building_repo: BuildingRepository,
-        activity_repo: ActivityRepository
+        activity_repo: ActivityRepository,
+        redis_service: RedisService
     ) -> CreateOrganizationResponse:
         """Создать организацию"""
         await self._check_building_exists(organization.building_id, building_repo)
@@ -129,6 +149,9 @@ class OrganizationService:
             building_id=organization.building_id,
             activity_ids=organization.activity_ids
         ))
+
+        await redis_service.del_cache_pattern("organizations:*")
+
         return CreateOrganizationResponse(id=res)
 
 
@@ -138,7 +161,8 @@ class OrganizationService:
         organization: UpdateOrganizationRequest,
         org_repo: OrganizationRepository,
         building_repo: BuildingRepository,
-        activity_repo: ActivityRepository
+        activity_repo: ActivityRepository,
+        redis_service: RedisService
     ) -> None:
         """Обновить организацию"""
         await self._check_organization_exists(organization_id, org_repo)
@@ -156,14 +180,21 @@ class OrganizationService:
             activity_ids=organization.activity_ids
         ))
 
+        await redis_service.del_cache(f"organization:{organization_id}")
+        await redis_service.del_cache_pattern("organizations:*")
+
     async def delete_organization(
         self,
         organization_id: int,
-        org_repo: OrganizationRepository
+        org_repo: OrganizationRepository,
+        redis_service: RedisService
     ) -> None:
         """Удалить организацию"""
         await self._check_organization_exists(organization_id, org_repo)
         await org_repo.delete(organization_id)
+
+        await redis_service.del_cache(f"organization:{organization_id}")
+        await redis_service.del_cache_pattern("organizations:*")
 
 
 def get_organization_service() -> OrganizationService:

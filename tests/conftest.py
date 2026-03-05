@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, Asyn
 from httpx import ASGITransport, AsyncClient
 
 from src.core.db.db_manager import get_db_session
+from src.integrations.redis import RedisService, get_redis_service
 from src.settings import app_settings, db_settings
 from src.main import app as fastapi_app
 from tests.utils import clear_database, insert_test_data
@@ -32,11 +33,20 @@ async def db_session(test_engine):
         await session.rollback()  # чистим после теста
 
 
+@pytest.fixture(scope="function")
+async def redis_service_test():
+    """Тестовый сервис Redis"""
+    service = RedisService()
+    await service.redis_client.flushdb()
+    yield service
+    await service.redis_client.flushdb()
+
+
 @pytest.fixture
-async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
+async def client(db_session, redis_service_test) -> AsyncGenerator[AsyncClient, None]:
     """Клиент для запросов в тестах"""
-    # Переопределяем зависимость get_db_session на тестовую сессию
     fastapi_app.dependency_overrides[get_db_session] = lambda: db_session
+    fastapi_app.dependency_overrides[get_redis_service] = lambda: redis_service_test
     async with AsyncClient(
         transport=ASGITransport(app=fastapi_app),
         base_url="http://test"
