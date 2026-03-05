@@ -2,9 +2,25 @@
 
 from fastapi import HTTPException, status
 
-from src.core.dto.organization import OrganizationDTO
+from src.activities.repository import ActivityRepository
+from src.buildings.repository import BuildingRepository
+from src.core.dto.building import BuildingDTO
+from src.core.dto.organization import (
+    CreateOrganizationDTO,
+    OrganizationDTO,
+    UpdateOrganizationDTO,
+)
 from src.organizations.repository import OrganizationRepository
-from src.organizations.schemas import BuildingSchema, GetOrganizationResponse, GetOrganizationsResponse, OrganizationFilters, OrganizationSchema
+from src.organizations.schemas import (
+    BuildingSchema,
+    CreateOrganizationRequest,
+    CreateOrganizationResponse,
+    GetOrganizationResponse,
+    GetOrganizationsResponse,
+    OrganizationFilters,
+    OrganizationSchema,
+    UpdateOrganizationRequest,
+)
 
 
 class OrganizationService:
@@ -22,6 +38,46 @@ class OrganizationService:
             building=BuildingSchema(**organization.building.to_dict()),
             activities=[a.name for a in organization.activities],
         )
+    
+    async def _check_organization_exists(
+        self,
+        organization_id: int,
+        repo: OrganizationRepository
+    ) -> OrganizationDTO:
+        """Проверка существования организации"""
+        organization = await repo.get_by_id(organization_id)
+        if organization is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Организация не найдена"
+            )
+        return organization
+    
+    async def _check_building_exists(
+        self,
+        building_id: int,
+        repo: BuildingRepository
+    ) -> BuildingDTO:
+        """Проверка существования здания"""
+        building = await repo.get_by_id(building_id)
+        if building is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Здание не найдено"
+            )
+        return building
+    
+    async def _check_activities_exists(
+        self,
+        activity_ids: list[int],
+        repo: ActivityRepository
+    ) -> None:
+        """Проверка существования активностей"""
+        if not await repo.check_all_exist(activity_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Одна или несколько видов деятельности не найдены"
+            )
     
     async def get_organizations(
         self,
@@ -52,13 +108,62 @@ class OrganizationService:
         repo: OrganizationRepository
     ) -> GetOrganizationResponse:
         """Получить организацию по ID"""
-        result = await repo.get_by_id(organization_id)
-        if result is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Организация не найдена"
-            )
+        result = await self._check_organization_exists(organization_id, repo)
         return GetOrganizationResponse(organization=self._build_organization_response(result))
+
+    async def create_organization(
+        self,
+        organization: CreateOrganizationRequest,
+        org_repo: OrganizationRepository,
+        building_repo: BuildingRepository,
+        activity_repo: ActivityRepository
+    ) -> CreateOrganizationResponse:
+        """Создать организацию"""
+        await self._check_building_exists(organization.building_id, building_repo)
+        
+        await self._check_activities_exists(organization.activity_ids, activity_repo)
+
+        res = await org_repo.create(CreateOrganizationDTO(
+            name=organization.name,
+            phones=organization.phones,
+            building_id=organization.building_id,
+            activity_ids=organization.activity_ids
+        ))
+        return CreateOrganizationResponse(id=res)
+
+
+    async def update_organization(
+        self,
+        organization_id: int,
+        organization: UpdateOrganizationRequest,
+        org_repo: OrganizationRepository,
+        building_repo: BuildingRepository,
+        activity_repo: ActivityRepository
+    ) -> None:
+        """Обновить организацию"""
+        await self._check_organization_exists(organization_id, org_repo)
+
+        if organization.building_id is not None:
+            await self._check_building_exists(organization.building_id, building_repo)
+        
+        if organization.activity_ids is not None:
+            await self._check_activities_exists(organization.activity_ids, activity_repo)
+
+        await org_repo.update(organization_id, UpdateOrganizationDTO(
+            name=organization.name,
+            phones=organization.phones,
+            building_id=organization.building_id,
+            activity_ids=organization.activity_ids
+        ))
+
+    async def delete_organization(
+        self,
+        organization_id: int,
+        org_repo: OrganizationRepository
+    ) -> None:
+        """Удалить организацию"""
+        await self._check_organization_exists(organization_id, org_repo)
+        await org_repo.delete(organization_id)
 
 
 def get_organization_service() -> OrganizationService:

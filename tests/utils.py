@@ -45,62 +45,60 @@ async def insert_test_data(db_session: AsyncSession) -> None:
 
     buildings = [
         Building(
-            id=1,
             address="г. Москва, ул. Ленина, 1",
             location=WKTElement("POINT(37.617734 55.755864)", srid=4326),
         ),
         Building(
-            id=2,
             address="г. Москва, ул. Тверская, 10",
             location=WKTElement("POINT(37.605469 55.764125)", srid=4326),
         ),
         Building(
-            id=3,
             address="г. Москва, ул. Арбат, 12",
             location=WKTElement("POINT(37.598807 55.752023)", srid=4326),
         ),
         Building(
-            id=4,
             address="г. Москва, ул. Профсоюзная, 45",
             location=WKTElement("POINT(37.540012 55.676095)", srid=4326),
         ),
     ]
 
     db_session.add_all(buildings)
+    await db_session.flush()
 
     orgs = [
-        Organization(id=1, name='ООО "Рога и Копыта"', building_id=1),
-        Organization(id=2, name='ООО "Молочный мир"', building_id=2),
-        Organization(id=3, name='Автоцентр "DrivePro"', building_id=3),
-        Organization(id=4, name='Грузовой сервис "TruckMaster"', building_id=4),
-        Organization(id=5, name='Сервисный центр "ТехноФикс"', building_id=2),
+        Organization(name='ООО "Рога и Копыта"', building_id=buildings[0].id),
+        Organization(name='ООО "Молочный мир"', building_id=buildings[1].id),
+        Organization(name='Автоцентр "DrivePro"', building_id=buildings[2].id),
+        Organization(name='Грузовой сервис "TruckMaster"', building_id=buildings[3].id),
+        Organization(name='Сервисный центр "ТехноФикс"', building_id=buildings[1].id),
     ]
 
     db_session.add_all(orgs)
+    await db_session.flush()
 
     phones = [
-        OrganizationPhone(organization_id=1, phone="2-222-222"),
-        OrganizationPhone(organization_id=1, phone="8-923-666-13-13"),
-        OrganizationPhone(organization_id=2, phone="3-333-333"),
-        OrganizationPhone(organization_id=3, phone="+7-495-111-22-33"),
-        OrganizationPhone(organization_id=3, phone="+7-495-111-22-34"),
-        OrganizationPhone(organization_id=4, phone="+7-495-222-33-44"),
-        OrganizationPhone(organization_id=5, phone="+7-495-777-88-99"),
+        OrganizationPhone(organization_id=orgs[0].id, phone="+72222222222"),
+        OrganizationPhone(organization_id=orgs[0].id, phone="+79236661313"),
+        OrganizationPhone(organization_id=orgs[1].id, phone="+73333333333"),
+        OrganizationPhone(organization_id=orgs[2].id, phone="+74951112233"),
+        OrganizationPhone(organization_id=orgs[2].id, phone="+74951112234"),
+        OrganizationPhone(organization_id=orgs[3].id, phone="+74952223344"),
+        OrganizationPhone(organization_id=orgs[4].id, phone="+74957778899"),
     ]
 
     db_session.add_all(phones)
-
     await db_session.flush()
+
     await db_session.execute(insert(organization_activities), [
-        {"organization_id": 1, "activity_id": 4},
-        {"organization_id": 1, "activity_id": 5},
-        {"organization_id": 2, "activity_id": 5},
-        {"organization_id": 3, "activity_id": 6},
-        {"organization_id": 3, "activity_id": 9},
-        {"organization_id": 3, "activity_id": 10},
-        {"organization_id": 4, "activity_id": 7},
-        {"organization_id": 4, "activity_id": 11},
-        {"organization_id": 5, "activity_id": 8},
+        {"organization_id": orgs[0].id, "activity_id": 4},
+        {"organization_id": orgs[0].id, "activity_id": 5},
+        {"organization_id": orgs[1].id, "activity_id": 5},
+        {"organization_id": orgs[2].id, "activity_id": 6},
+        {"organization_id": orgs[2].id, "activity_id": 9},
+        {"organization_id": orgs[2].id, "activity_id": 10},
+        {"organization_id": orgs[3].id, "activity_id": 7},
+        {"organization_id": orgs[3].id, "activity_id": 11},
+        {"organization_id": orgs[4].id, "activity_id": 8},
     ])
 
     await db_session.commit()

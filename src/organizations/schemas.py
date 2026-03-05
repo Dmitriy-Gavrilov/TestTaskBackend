@@ -1,6 +1,11 @@
 """Схемы для работы с организациями"""
 
-from pydantic import BaseModel, Field, model_validator
+from typing import Annotated
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+PhoneStr = Annotated[str, Field(pattern=r'^\+?[1-9]\d{7,14}$')]
+ActivityStr = Annotated[str, Field(min_length=1, max_length=255)]
 
 
 class OrganizationFilters(BaseModel):
@@ -43,6 +48,12 @@ class OrganizationFilters(BaseModel):
         return values
 
 
+class BaseOrganizationSchema(BaseModel):
+    """Базовая схема для данных организации"""
+    name: str = Field(..., description="Название организации", min_length=1, max_length=255)
+    phones: list[PhoneStr] = Field(..., description="Список телефонов организации")
+
+
 class BuildingSchema(BaseModel):
     """Схема для данных здания"""
     id: int = Field(..., description="ID здания")
@@ -51,13 +62,11 @@ class BuildingSchema(BaseModel):
     latitude: float = Field(..., description="Широта здания")
 
 
-class OrganizationSchema(BaseModel):
+class OrganizationSchema(BaseOrganizationSchema):
     """Схема для данных организации"""
     id: int = Field(..., description="ID организации")
-    name: str = Field(..., description="Название организации")
-    phones: list[str] = Field(..., description="Список телефонов организации")
     building: BuildingSchema = Field(..., description="Данные здания")
-    activities: list[str] = Field(..., description="Список видов деятельности")
+    activities: list[ActivityStr] = Field(..., description="Список видов деятельности")
 
 
 class GetOrganizationResponse(BaseModel):
@@ -68,3 +77,33 @@ class GetOrganizationResponse(BaseModel):
 class GetOrganizationsResponse(BaseModel):
     """Ответ с информацией об организациях"""
     organizations: list[OrganizationSchema]
+
+
+class CreateOrganizationRequest(BaseOrganizationSchema):
+    """Запрос на создание организации"""
+    building_id: int = Field(..., description="ID здания")
+    activity_ids: list[int] = Field(..., description="Список ID видов деятельности")
+
+    @field_validator("phones", mode="before")
+    def unique_phones(cls, v: list[str]) -> list[str]:
+        return list(set(v))
+
+
+class CreateOrganizationResponse(BaseModel):
+    """Ответ на создание организации"""
+    id: int = Field(..., description="ID созданной организации")
+
+
+class UpdateOrganizationRequest(BaseModel):
+    """Запрос на обновление организации"""
+    name: str | None = Field(
+        None, description="Название организации", min_length=1, max_length=255)
+    phones: list[PhoneStr] | None = Field(None, description="Список телефонов организации")
+    building_id: int | None = Field(None, description="ID здания")
+    activity_ids: list[int] | None = Field(None, description="Список ID видов деятельности")
+
+    @field_validator("phones", mode="before")
+    def unique_phones(cls, v: list[str]) -> list[str]:
+        return list(set(v))
+
+

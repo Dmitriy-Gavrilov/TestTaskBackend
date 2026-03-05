@@ -10,6 +10,9 @@ Organizations API — это веб-сервис на базе FastAPI для у
 - Географический поиск по радиусу и прямоугольной области
 - Фильтрация по зданиям, видам деятельности и названиям
 - Поддержка иерархической структуры видов деятельности
+- Создание новых организаций
+- Обновление существующих организаций
+- Удаление организаций
 
 ## Структура проекта
 
@@ -27,6 +30,10 @@ src/
 │       ├── organization.py    # DTO для организаций
 │       ├── building.py        # DTO для зданий
 │       └── activity.py        # DTO для видов деятельности
+├── activities/                # Модуль видов деятельности
+│   └── repository.py          # Репозиторий видов деятельности
+├── buildings/                 # Модуль зданий
+│   └── repository.py          # Репозиторий зданий
 └── organizations/              # Модуль организаций
     ├── router.py              # API роутеры
     ├── schemas.py             # Pydantic схемы
@@ -102,6 +109,31 @@ curl -H "X-API-Key: test-secret-key" \
 ```bash
 curl -H "X-API-Key: test-secret-key" \
   "http://localhost:8000/api/organizations?min_lat=55.7&min_lon=37.6&max_lat=55.8&max_lon=37.7"
+```
+
+**Создание новой организации:**
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-secret-key" \
+  -d '{"name": "Новая организация", "phones": ["+71234567890"], "building_id": 1, "activity_ids": [1,2]}' \
+  http://localhost:8000/api/organizations
+```
+
+**Обновление организации:**
+```bash
+curl -X PATCH \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-secret-key" \
+  -d '{"name": "Обновленное название"}' \
+  http://localhost:8000/api/organizations/1
+```
+
+**Удаление организации:**
+```bash
+curl -X DELETE \
+  -H "X-API-Key: test-secret-key" \
+  http://localhost:8000/api/organizations/1
 ```
 
 ## Технологический стек

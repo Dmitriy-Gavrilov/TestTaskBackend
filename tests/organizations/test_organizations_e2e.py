@@ -109,3 +109,100 @@ class TestOrganizationsAPI:
             headers={"X-API-Key": "test-key"}
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    async def test_create_organization_success(self, client: AsyncClient):
+        """Успешное создание организации"""
+        data = {
+            "name": "Новая организация",
+            "phones": ["+71234567890"],
+            "building_id": 1,
+            "activity_ids": [1, 2]
+        }
+        response = await client.post(
+            self.BASE_URL,
+            json=data,
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
+    async def test_create_organization_building_not_found(self, client: AsyncClient):
+        """Ошибка создания организации: здание не найдено"""
+        data = {
+            "name": "Новая организация",
+            "phones": ["+71234567890"],
+            "building_id": 999,
+            "activity_ids": [1]
+        }
+        response = await client.post(
+            self.BASE_URL,
+            json=data,
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    async def test_create_organization_activity_not_found(self, client: AsyncClient):
+        """Ошибка создания организации: вид деятельности не найден"""
+        data = {
+            "name": "Новая организация",
+            "phones": ["+71234567890"],
+            "building_id": 1,
+            "activity_ids": [999]
+        }
+        response = await client.post(
+            self.BASE_URL,
+            json=data,
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    async def test_update_organization_success(self, client: AsyncClient):
+        """Успешное обновление организации"""
+        data = {
+            "name": "Обновленная организация"
+        }
+        response = await client.patch(
+            f"{self.BASE_URL}/1",
+            json=data,
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+    async def test_update_organization_not_found(self, client: AsyncClient):
+        """Ошибка обновления организации: организация не найдена"""
+        data = {
+            "name": "Обновленная организация"
+        }
+        response = await client.patch(
+            f"{self.BASE_URL}/999",
+            json=data,
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    async def test_update_organization_building_not_found(self, client: AsyncClient):
+        """Ошибка обновления организации: здание не найдено"""
+        data = {
+            "building_id": 999
+        }
+        response = await client.patch(
+            f"{self.BASE_URL}/1",
+            json=data,
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    async def test_delete_organization_success(self, client: AsyncClient):
+        """Успешное удаление организации"""
+        response = await client.delete(
+            f"{self.BASE_URL}/1",
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    async def test_delete_organization_not_found(self, client: AsyncClient):
+        """Ошибка удаления организации: организация не найдена"""
+        response = await client.delete(
+            f"{self.BASE_URL}/999",
+            headers={"X-API-Key": "test-key"}
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND

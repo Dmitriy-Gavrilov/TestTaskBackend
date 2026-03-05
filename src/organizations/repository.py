@@ -1,7 +1,7 @@
 """Репозиторий для работы с организациями"""
 
 from geoalchemy2 import Geometry
-from sqlalchemy import ColumnElement, Row, Select, cast, exists, select, func
+from sqlalchemy import ColumnElement, Row, Select, cast, delete, exists, insert, select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from geoalchemy2.functions import ST_X, ST_Y, ST_DWithin, ST_MakeEnvelope, ST_MakePoint
 from sqlalchemy.sql.functions import array_agg
@@ -19,7 +19,7 @@ from src.core.db.models import (
 from src.core.db.db_manager import get_db_session
 from src.core.dto.activity import ActivityDTO
 from src.core.dto.building import BuildingDTO
-from src.core.dto.organization import OrganizationDTO
+from src.core.dto.organization import CreateOrganizationDTO, OrganizationDTO, UpdateOrganizationDTO
 
 
 class OrganizationRepository(BaseRepository[Organization, OrganizationDTO]):
@@ -125,6 +125,28 @@ class OrganizationRepository(BaseRepository[Organization, OrganizationDTO]):
         envelope = ST_MakeEnvelope(min_lon, min_lat, max_lon, max_lat, SRID_WGS84)
         return Building.location.ST_Intersects(envelope)
 
+    def _add_phones(self, organization_id: int, phones: list[str]) -> None:
+        """Добавление телефонов к организации"""
+        new_phones = [
+            OrganizationPhone(
+                organization_id=organization_id,
+                phone=p,
+            )
+            for p in phones
+        ]
+        self.session.add_all(new_phones)
+    
+    async def _add_activities(self, organization_id: int, activities: list[int]) -> None:
+        """Добавление активностей к организации"""
+        stmt = insert(organization_activities).values([
+            {
+                "organization_id": organization_id,
+                "activity_id": aid,
+            }
+            for aid in activities
+        ])
+        await self.session.execute(stmt)
+    
     async def get_with_filters(
         self,
         *,
@@ -165,6 +187,65 @@ class OrganizationRepository(BaseRepository[Organization, OrganizationDTO]):
         if result is None:
             return None
         return self._build_dto(result)
+
+    async def create(self, organization: CreateOrganizationDTO) -> int:
+        """Создание организации"""
+        org = Organization(
+            name=organization.name,
+            building_id=organization.building_id,
+        )
+        self.session.add(org)
+        await self.session.flush()
+        await self.session.refresh(org)
+
+        self._add_phones(org.id, organization.phones)
+        await self._add_activities(org.id, organization.activity_ids)
+
+        await self.session.commit()
+
+        return org.id
+
+    async def update(self, organization_id: int, organization: UpdateOrganizationDTO) -> None:
+        """Обновление организации"""
+        values = {}
+
+        if organization.name is not None:
+            values["name"] = organization.name
+        if organization.building_id is not None:
+            values["building_id"] = organization.building_id
+        
+        stmt = (
+            update(Organization)
+            .where(Organization.id == organization_id)
+            .values(**values)
+        )
+        await self.session.execute(stmt)
+        
+        if organization.phones is not None:
+           self._add_phones(organization_id, organization.phones)
+        if organization.activity_ids is not None:
+           await self._add_activities(organization_id, organization.activity_ids)
+
+        await self.session.commit()
+    
+    async def delete(self, organization_id: int) -> None:
+        """Удаление организации"""
+        await self.session.execute(
+            delete(Organization)
+            .where(Organization.id == organization_id)
+        )
+        
+        await self.session.execute(
+            delete(OrganizationPhone)
+            .where(OrganizationPhone.organization_id == organization_id)
+        )
+
+        await self.session.execute(
+            delete(organization_activities)
+            .where(organization_activities.c.organization_id == organization_id)
+        )
+        
+        await self.session.commit()
 
 
 def get_organization_repository(session: AsyncSession = Depends(get_db_session)) -> OrganizationRepository:

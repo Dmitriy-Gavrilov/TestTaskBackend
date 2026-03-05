@@ -3,6 +3,7 @@
 from typing import AsyncGenerator
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 from httpx import ASGITransport, AsyncClient
 
@@ -47,6 +48,15 @@ async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
 async def default_data(db_session: AsyncSession):
     """Загрузка тестовых данных"""
     await clear_database(db_session)
+    sequences = [
+        "buildings_id_seq",
+        "organizations_id_seq",
+        "activities_id_seq",
+        "organization_phones_id_seq",
+    ]
+    for seq in sequences:
+        await db_session.execute(text(f"ALTER SEQUENCE {seq} RESTART WITH 1;"))
+    await db_session.commit()
     await insert_test_data(db_session)
 
 
